@@ -15,9 +15,8 @@ import { StatusBar } from 'expo-status-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as DocumentPicker from 'expo-document-picker'; // Necesario para SAF/Picker
+import * as DocumentPicker from 'expo-document-picker'; 
 
-// Importación específica de StorageAccessFramework (SAF)
 const { StorageAccessFramework } = FileSystem;
 
 // ----------------------------------------------------------------------
@@ -31,6 +30,10 @@ interface FileInfo {
 }
 
 const FORMAT_OPTIONS = ['JSON', 'TXT'];
+
+// --- HORARIO OPERATIVO ---
+const OPEN_HOUR = 11; // 11 AM
+const CLOSE_HOUR = 22; // 10 PM (Reservas hasta 21:59)
 
 // --- Paleta de Colores (Dark Mode) ---
 const COLORS = {
@@ -73,7 +76,7 @@ export default function App() {
 
     const areaOptions = ['Interior', 'Terraza', 'Barra', 'Salón Privado'];
 
-    // --- Funciones de Utilidad de Fecha (Omisión para brevedad, asumiendo que existen) ---
+    // --- Funciones de Utilidad de Fecha ---
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 101 }, (_, i) => currentYear - 50 + i);
     const months = [
@@ -90,7 +93,7 @@ export default function App() {
     // --- Fin de Funciones de Utilidad de Fecha ---
 
 
-    // --- Lógica de Archivos ---
+    // --- Lógica de Archivos y Formato ---
 
     function getDocumentDirectory(): string | null {
         if (Platform.OS === 'web') {
@@ -163,11 +166,55 @@ Guardado: ${obj.guardado}`;
         return `RESERVA-${sanitizedName}-${datePart}.${extension}`;
     }
 
+    // --- FUNCIÓN DE VALIDACIÓN COMPLETA (Fecha pasada y Horario operativo) ---
+    function validateReservation(reservationDate: Date, reservationTime: Date): boolean {
+        const now = new Date();
+        const selectedDateTime = new Date(
+            reservationDate.getFullYear(), 
+            reservationDate.getMonth(), 
+            reservationDate.getDate(), 
+            reservationTime.getHours(), 
+            reservationTime.getMinutes()
+        );
+
+        // 1. Validar Horario Operativo
+        const selectedHour = reservationTime.getHours();
+
+        if (selectedHour < OPEN_HOUR || selectedHour >= CLOSE_HOUR) {
+            Alert.alert(
+                'Error de Horario', 
+                `Solo aceptamos reservas entre las ${OPEN_HOUR}:00 y las ${CLOSE_HOUR}:00.`
+            );
+            return false;
+        }
+        
+        // 2. Validar que la fecha no sea pasada
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const selectedDateStart = new Date(reservationDate.getFullYear(), reservationDate.getMonth(), reservationDate.getDate());
+
+        if (selectedDateStart < startOfToday) {
+            Alert.alert('Error de Fecha', 'No se permiten reservas en fechas pasadas.');
+            return false;
+        }
+
+        // 3. Validar que la hora no sea pasada (SOLO si la fecha es HOY)
+        if (selectedDateStart.getTime() === startOfToday.getTime()) {
+            // Damos un margen de 5 minutos al tiempo actual
+            if (selectedDateTime.getTime() < now.getTime() - (5 * 60 * 1000)) { 
+                 Alert.alert('Error de Hora', 'La hora seleccionada para hoy ya ha pasado.');
+                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    // --- Funciones de Exportación ---
+
     async function performShare(fileUri: string, mimeType: string) {
         try {
             const canShare = await Sharing.isAvailableAsync();
             if (canShare) {
-                // Función de compartir usada en iOS o como fallback en Android
                 await Sharing.shareAsync(fileUri, {
                     mimeType: mimeType,
                     dialogTitle: 'Exportar Reserva (Selecciona App/Ubicación)',
@@ -180,10 +227,10 @@ Guardado: ${obj.guardado}`;
         }
     }
     
-    // --- NUEVA FUNCIÓN: Guarda el archivo usando SAF (Solo Android) o Sharing (iOS) ---
+    // --- FUNCIÓN SAF/SHARING para selección de carpeta ---
     async function saveToSelectedFolder(latestFile: FileInfo, mimeType: string, extension: string) {
         if (Platform.OS !== 'android') {
-            // --- iOS: Usa Sharing (Única opción para exportar) ---
+            // iOS: Usa Sharing
             await performShare(latestFile.uri, mimeType);
             Alert.alert(
                 'Exportación Iniciada',
@@ -193,35 +240,28 @@ Guardado: ${obj.guardado}`;
             return;
         }
 
-        // --- Android: Lógica de SAF para selección de carpeta ---
+        // Android: Lógica de SAF
         try {
-            // 1. Pedir permisos de escritura (necesario para SAF)
             const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-            
-
             if (!permissions.granted) {
                 Alert.alert('Permisos Denegados', 'Necesitas otorgar permisos para seleccionar la carpeta de destino.');
                 return;
             }
 
-            // 2. Leer el contenido del archivo temporal (del sandbox)
             const content = await FileSystem.readAsStringAsync(latestFile.uri, {
                 encoding: FileSystem.EncodingType.UTF8,
             });
             
             const fileName = latestFile.name;
 
-            // 3. Usar SAF para que el usuario seleccione la ubicación y cree el archivo
-            // ESTO ABRE EL DIÁLOGO NATIVO DE SELECCIÓN DE CARPETA/ARCHIVO
+            // Abrir el diálogo nativo de Android para SELECCIONAR la carpeta y crear el archivo
             const uri = await StorageAccessFramework.createFileAsync(
-                permissions.directoryUri, // La URI de la carpeta ya seleccionada (o sugerida)
-                fileName.replace(`.${extension}`, ''), // Nombre base del archivo
+                permissions.directoryUri, 
+                fileName.replace(`.${extension}`, ''), 
                 mimeType
             );
-            
 
             if (uri) {
-                // 4. Escribir el contenido en la nueva ubicación (Descargas/Carpeta Seleccionada)
                 await FileSystem.writeAsStringAsync(uri, content, {
                     encoding: FileSystem.EncodingType.UTF8,
                 });
@@ -232,7 +272,6 @@ Guardado: ${obj.guardado}`;
                     [{ text: 'OK' }]
                 );
             } else {
-                // Cancelado por el usuario
                 Alert.alert('Exportación Cancelada', 'No se seleccionó una ubicación de destino.');
             }
 
@@ -249,13 +288,19 @@ Guardado: ${obj.guardado}`;
             return;
         }
 
+        // --- VALIDACIÓN CRÍTICA ---
+        if (!validateReservation(date, time)) {
+            return;
+        }
+        // -------------------------
+
         setSaving(true);
         try {
             const { content, mimeType, extension } = generateContent(selectedFormat);
             let fileName = generateFileName(extension);
 
             if (Platform.OS === 'web') {
-                // Lógica de descarga en Web (no necesita SAF)
+                // Lógica de descarga en Web
                 const blob = new Blob([content], { type: mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -274,7 +319,6 @@ Guardado: ${obj.guardado}`;
             const docDir = getDocumentDirectory();
             if (!docDir) throw new Error('No se encontró un directorio disponible para guardar.');
 
-            // Guardar internamente en el sandbox
             const fileUri = docDir + fileName;
             await FileSystem.writeAsStringAsync(fileUri, content, {
                 encoding: FileSystem.EncodingType.UTF8,
@@ -290,7 +334,6 @@ Guardado: ${obj.guardado}`;
                     {
                         text: 'Exportar a Carpeta',
                         onPress: async () => {
-                            // Ofrecemos exportar usando SAF/Sharing inmediatamente después de guardar
                             await saveToSelectedFolder({ name: fileName, uri: fileUri }, mimeType, extension);
                         },
                     },
@@ -341,7 +384,6 @@ Guardado: ${obj.guardado}`;
                 }
             }
 
-            // Ordenar por nombre (generalmente el más reciente está cerca del inicio)
             reservationFiles.sort((a, b) => b.name.localeCompare(a.name));
 
             setFiles(reservationFiles);
@@ -362,7 +404,6 @@ Guardado: ${obj.guardado}`;
 
             const mimeType = fileInfo.name.endsWith('.txt') ? 'text/plain' : 'application/json';
 
-            // Usamos Sharing, que funciona como "Exportar" para archivos individuales
             await performShare(fileInfo.uri, mimeType);
 
         } catch (e: any) {
@@ -399,7 +440,6 @@ Guardado: ${obj.guardado}`;
         );
     }
 
-    // --- FUNCIÓN PRINCIPAL: Inicia la lógica de selección de carpeta (SAF/Sharing) ---
     async function openDirectoryLocation() {
         if (Platform.OS === 'web') {
             Alert.alert('Acceso a Archivos', 'En web, los archivos se descargan directamente en tu carpeta de descargas del navegador.');
@@ -417,7 +457,6 @@ Guardado: ${obj.guardado}`;
         const mimeType = latestFile.name.endsWith('.txt') ? 'text/plain' : 'application/json';
         const extension = latestFile.name.endsWith('.txt') ? 'txt' : 'json';
 
-        // Llamamos a la función que implementa la lógica del selector de carpeta
         await saveToSelectedFolder(latestFile, mimeType, extension);
     }
     
@@ -426,7 +465,18 @@ Guardado: ${obj.guardado}`;
         if (Platform.OS !== 'web') setShowDatePicker(false); 
 
         if (event.type === 'set' && selectedDate) {
-            setDate(selectedDate);
+            // Asegurarse de que la fecha seleccionada no sea pasada (aunque el mínimo debería ser el actual)
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const selectedDateStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+
+            if (selectedDateStart < startOfToday) {
+                 Alert.alert('Advertencia', 'No puedes seleccionar una fecha pasada.');
+                 // Vuelve a la fecha actual si selecciona una pasada
+                 setDate(startOfToday); 
+            } else {
+                 setDate(selectedDate);
+            }
         }
     };
 
@@ -434,7 +484,17 @@ Guardado: ${obj.guardado}`;
         if (Platform.OS !== 'web') setShowTimePicker(false);
         
         if (event.type === 'set' && selectedTime) {
-            setTime(selectedTime);
+             const selectedHour = selectedTime.getHours();
+             
+             // Validación de horario en el selector nativo
+             if (selectedHour < OPEN_HOUR || selectedHour >= CLOSE_HOUR) {
+                Alert.alert('Advertencia', `Solo puedes reservar entre las ${OPEN_HOUR}:00 y las ${CLOSE_HOUR}:00.`);
+                // Intentar ajustar a la hora de apertura si es posible, o dejar la actual
+                selectedTime.setHours(OPEN_HOUR);
+                selectedTime.setMinutes(0);
+             } 
+             
+             setTime(selectedTime);
         }
     };
 
@@ -475,7 +535,6 @@ Guardado: ${obj.guardado}`;
                 <Text style={styles.cardTitle}>Crea tu Reserva</Text>
                 <View style={styles.separator} />
 
-                {/* Campo Nombre */}
                 <Text style={styles.label}>Nombre del Cliente:</Text>
                 <TextInput
                     style={styles.input}
@@ -485,10 +544,7 @@ Guardado: ${obj.guardado}`;
                     onChangeText={setClientName}
                     autoCapitalize="words"
                 />
-                {/* [Otros campos de input: Teléfono, Comensales, Área, Fecha, Hora, Notas] */}
-                {/* ... (código omitido para brevedad, asumiendo que los inputs intermedios existen) */}
-                
-                {/* Campo Teléfono */}
+
                 <Text style={styles.label}>Teléfono (Opcional):</Text>
                 <TextInput
                     style={styles.input}
@@ -497,9 +553,9 @@ Guardado: ${obj.guardado}`;
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     keyboardType="phone-pad"
+                    maxLength={10}
                 />
 
-                {/* Campo Comensales */}
                 <Text style={styles.label}>Comensales:</Text>
                 <TextInput
                     style={styles.input}
@@ -511,7 +567,6 @@ Guardado: ${obj.guardado}`;
                     maxLength={2}
                 />
 
-                {/* Selector de Área */}
                 <Text style={styles.label}>Área de Reserva:</Text>
                 <TouchableOpacity
                     style={styles.pickerDisplay}
@@ -522,7 +577,6 @@ Guardado: ${obj.guardado}`;
                     </Text>
                 </TouchableOpacity>
                 
-                {/* Selector de Fecha */}
                 <Text style={styles.label}>Fecha de la Reserva:</Text>
                 <TouchableOpacity
                     style={styles.pickerDisplay}
@@ -533,8 +587,7 @@ Guardado: ${obj.guardado}`;
                     </Text>
                 </TouchableOpacity>
                 
-                {/* Selector de Hora */}
-                <Text style={styles.label}>Hora de la Reserva:</Text>
+                <Text style={styles.label}>Hora de la Reserva (Entre {OPEN_HOUR}:00 y {CLOSE_HOUR}:00):</Text>
                 <TouchableOpacity
                     style={styles.pickerDisplay}
                     onPress={() => showDateTimePicker('time')}
@@ -544,7 +597,6 @@ Guardado: ${obj.guardado}`;
                     </Text>
                 </TouchableOpacity>
 
-                {/* Campo Notas */}
                 <Text style={styles.label}>Notas Especiales:</Text>
                 <TextInput
                     style={[styles.input, styles.textArea]}
@@ -554,10 +606,7 @@ Guardado: ${obj.guardado}`;
                     onChangeText={setNotes}
                     multiline
                 />
-                {/* Fin de campos de input */}
 
-
-                {/* Selector de FORMATO */}
                 <Text style={styles.label}>Formato de Exportación:</Text>
                 <TouchableOpacity
                     style={styles.pickerDisplay}
@@ -594,7 +643,6 @@ Guardado: ${obj.guardado}`;
                         <Text style={styles.refreshButtonText}>Actualizar Lista</Text>
                     </TouchableOpacity>
 
-                    {/* Botón: Abrir Ubicación (Ahora abre el selector de carpeta/archivo con SAF) */}
                     <TouchableOpacity
                         style={[styles.actionButton, styles.smallActionButton, { flex: 1, backgroundColor: COLORS.info }]}
                         onPress={openDirectoryLocation}
@@ -651,7 +699,7 @@ Guardado: ${obj.guardado}`;
                     is24Hour={true}
                     display={Platform.OS === 'android' ? 'default' : 'spinner'} 
                     onChange={onChangeDate}
-                    // Omitir propiedad 'textColor' para compatibilidad en algunos ambientes
+                    minimumDate={new Date()} // Restringe la selección a hoy o futuro
                 />
             )}
             
@@ -663,7 +711,6 @@ Guardado: ${obj.guardado}`;
                     is24Hour={false} 
                     display={Platform.OS === 'android' ? 'default' : 'spinner'}
                     onChange={onChangeTime}
-                    // Omitir propiedad 'textColor' para compatibilidad en algunos ambientes
                 />
             )}
             
@@ -720,10 +767,8 @@ Guardado: ${obj.guardado}`;
 }
 
 // ----------------------------------------------------------------------
-// --- 3. COMPONENTES MODALES AUXILIARES (CustomPickerModal, DatePickerModal, TimePickerModal)
+// --- 3. COMPONENTES MODALES AUXILIARES
 // ----------------------------------------------------------------------
-
-// *** NOTA: Los siguientes componentes de modales auxiliares (CustomPickerModal, DatePickerModal, TimePickerModal) son idénticos a la versión anterior y se mantienen para la funcionalidad completa del código, pero se omiten aquí para reducir la extensión del código. ***
 
 interface CustomPickerProps {
     visible: boolean;
@@ -808,8 +853,16 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
     getDaysArray,
 }) => {
     function handleAccept() {
-        setDate(tempDate);
-        onClose();
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const selectedDateStart = new Date(tempDate.getFullYear(), tempDate.getMonth(), tempDate.getDate());
+
+        if (selectedDateStart < startOfToday) {
+             Alert.alert('Advertencia', 'No puedes seleccionar una fecha pasada.');
+        } else {
+             setDate(tempDate);
+             onClose();
+        }
     }
     function handleCancel() {
         setTempDate(date);
@@ -905,13 +958,24 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
     setTime,
 }) => {
     function handleAccept() {
-        setTime(tempTime);
-        onClose();
+        const selectedHour = tempTime.getHours();
+        if (selectedHour < OPEN_HOUR || selectedHour >= CLOSE_HOUR) {
+             Alert.alert('Advertencia', `Solo puedes reservar entre las ${OPEN_HOUR}:00 y las ${CLOSE_HOUR}:00.`);
+        } else {
+             setTime(tempTime);
+             onClose();
+        }
     }
     function handleCancel() {
         setTempTime(time);
         onClose();
     }
+
+    // Horas disponibles (11:00 a 21:00)
+    const hours24 = Array.from(
+        { length: CLOSE_HOUR - OPEN_HOUR }, 
+        (_, i) => OPEN_HOUR + i
+    );
     
     return (
         <Modal
@@ -927,18 +991,28 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
 
                         <Text style={styles.pickerSectionTitle}>Hora:</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalPicker}>
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
-                                <TouchableOpacity key={hour} style={[styles.pickerItem, (tempTime.getHours() % 12 || 12) === hour && styles.pickerItemSelected]}
+                            {hours24.map((hour24) => {
+                                const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12; // Convierte 24h a 12h para mostrar
+                                
+                                return (
+                                    <TouchableOpacity key={hour24} style={[
+                                        styles.pickerItem, 
+                                        tempTime.getHours() === hour24 && styles.pickerItemSelected 
+                                    ]}
                                     onPress={() => {
                                         const newTime = new Date(tempTime);
-                                        const isPM = newTime.getHours() >= 12;
-                                        const newHour24 = isPM ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
-                                        newTime.setHours(newHour24);
+                                        newTime.setHours(hour24); 
                                         setTempTime(newTime);
                                     }}>
-                                    <Text style={[styles.pickerItemText, (tempTime.getHours() % 12 || 12) === hour && styles.pickerItemTextSelected]}>{hour}</Text>
-                                </TouchableOpacity>
-                            ))}
+                                        <Text style={[
+                                            styles.pickerItemText, 
+                                            tempTime.getHours() === hour24 && styles.pickerItemTextSelected
+                                        ]}>
+                                            {hour12}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </ScrollView>
 
                         <Text style={styles.pickerSectionTitle}>Minutos:</Text>
@@ -988,7 +1062,6 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
         </Modal>
     );
 };
-// --- Fin de Componentes Modales Auxiliares ---
 
 
 // ----------------------------------------------------------------------
