@@ -5,7 +5,6 @@ import {
   Text,
   View,
   TextInput,
-  Button,
   Alert,
   ActivityIndicator,
   Platform,
@@ -27,8 +26,21 @@ interface FileInfo {
 
 const FORMAT_OPTIONS = ['JSON', 'TXT'];
 
+// --- Paleta de Colores (Inspirada en el Dark Mode del ejemplo) ---
+const COLORS = {
+  background: '#121212', // Fondo muy oscuro
+  card: '#1F1F1F', // Fondo de la tarjeta (un poco más claro que el fondo)
+  textPrimary: '#FFFFFF',
+  textSecondary: '#B0B0B0',
+  inputBackground: '#2C2C2C',
+  accent: '#FF4500', // Naranja/Rojo brillante para el botón principal (como 'Log In' o 'Add Cart')
+  danger: '#DC3545',
+  info: '#17A2B8',
+};
+
+
 export default function App() {
-  // --- Estados del Formulario ---
+  // --- Estados del Formulario (Mantenidos) ---
   const [clientName, setClientName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [diners, setDiners] = useState('');
@@ -41,7 +53,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState<FileInfo[]>([]);
 
-  // --- Estados de Modales/Pickers ---
+  // --- Estados de Modales/Pickers (Mantenidos) ---
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showOptionsPicker, setShowOptionsPicker] = useState(false);
@@ -68,14 +80,8 @@ export default function App() {
     const days = getDaysInMonth(year, month);
     return Array.from({ length: days }, (_, i) => i + 1);
   }
-  // --- Fin de funciones de utilidad de fecha ---
 
-  useEffect(() => {
-    if (Platform.OS !== 'web') {
-      refreshFiles();
-    }
-  }, []);
-
+  // --- Funciones de Lógica de Negocio (Mantenidas) ---
   function getDocumentDirectory(): string | null {
     if (Platform.OS === 'web') {
       return null;
@@ -99,9 +105,7 @@ export default function App() {
     const minutesStr = String(minutes).padStart(2, '0');
     return `${hours}:${minutesStr} ${ampm}`;
   }
-
-  // --- Funciones de Lógica de Negocio (Mantenidas) ---
-
+  
   function createReservationObject() {
     return {
       nombreCliente: clientName.trim(),
@@ -318,8 +322,6 @@ Guardado: ${obj.guardado}`;
 
   // --- Funciones para DateTimePicker Nativo (Android/iOS) ---
   const onChangeDate = (event: any, selectedDate: Date | undefined) => {
-    // Si la plataforma no es Web, ocultamos el selector. En Android, esto lo cierra.
-    // En iOS, si se usa modo 'default' se oculta el modal nativo.
     if (Platform.OS !== 'web') setShowDatePicker(false); 
 
     if (event.type === 'set' && selectedDate) {
@@ -335,7 +337,6 @@ Guardado: ${obj.guardado}`;
     }
   };
 
-  // Función para mostrar el picker nativo (Android) o el modal personalizado (iOS/Web)
   const showDateTimePicker = (mode: 'date' | 'time') => {
     if (Platform.OS === 'android' || Platform.OS === 'ios') {
       if (mode === 'date') {
@@ -362,23 +363,24 @@ Guardado: ${obj.guardado}`;
     <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.contentContainer}
-        keyboardShouldPersistTaps="handled" // Mejora la usabilidad al escribir
+        keyboardShouldPersistTaps="handled" 
     >
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
-      <Text style={styles.title}>Sistema de Reservas 🗓️</Text>
-      <Text style={styles.headerSubtitle}>Administración de Mesas</Text>
+      <Text style={styles.title}>Super Food  🍽️</Text>
+      <Text style={styles.headerSubtitle}>Sistema de Reservas</Text>
 
-      {/* --- CARD PRINCIPAL DEL FORMULARIO --- */}
+    
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Crear Nueva Reserva</Text>
+        <Text style={styles.cardTitle}>Crea tu Reserva</Text>
         <View style={styles.separator} />
 
         {/* Campo Nombre */}
         <Text style={styles.label}>Nombre del Cliente:</Text>
         <TextInput
           style={styles.input}
-          placeholder="Nombre y Apellido..."
+          placeholder="Nombre y Apellido" 
+          placeholderTextColor={COLORS.textSecondary}
           value={clientName}
           onChangeText={setClientName}
           autoCapitalize="words"
@@ -388,7 +390,8 @@ Guardado: ${obj.guardado}`;
         <Text style={styles.label}>Teléfono (Opcional):</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ej. 555-555-5555"
+          placeholder="7713535821"
+          placeholderTextColor={COLORS.textSecondary}
           value={phoneNumber}
           onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
@@ -399,6 +402,7 @@ Guardado: ${obj.guardado}`;
         <TextInput
           style={styles.input}
           placeholder="Número de personas"
+          placeholderTextColor={COLORS.textSecondary}
           value={diners}
           onChangeText={setDiners}
           keyboardType="numeric"
@@ -442,14 +446,15 @@ Guardado: ${obj.guardado}`;
         <Text style={styles.label}>Notas Especiales:</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Ej. Silla de bebé, Cerca de la ventana..."
+          placeholder="Silla de bebé, Cerca de la ventana"
+          placeholderTextColor={COLORS.textSecondary}
           value={notes}
           onChangeText={setNotes}
           multiline
         />
 
         {/* Selector de FORMATO */}
-        <Text style={styles.label}>Formato de Guardado:</Text>
+        <Text style={styles.label}>Formato de Exportación:</Text>
         <TouchableOpacity
           style={styles.pickerDisplay}
           onPress={() => setShowFormatPicker(true)}
@@ -461,23 +466,21 @@ Guardado: ${obj.guardado}`;
 
         {/* Botón de guardar */}
         {saving ? (
-          <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+          <ActivityIndicator size="large" color={COLORS.accent} style={styles.loader} />
         ) : (
           <TouchableOpacity
             style={styles.actionButton}
             onPress={saveReservationJson}
           >
             <Text style={styles.actionButtonText}>
-              CONFIRMAR RESERVA y Guardar como {selectedFormat}
+              RESERVAR MESA ({selectedFormat})
             </Text>
           </TouchableOpacity>
         )}
       </View>
-      {/* --- FIN CARD PRINCIPAL --- */}
-
-      {/* --- LISTA DE ARCHIVOS --- */}
+      
       <View style={[styles.card, styles.filesCard]}>
-        <Text style={styles.cardTitle}>Archivos Guardados</Text>
+        <Text style={styles.cardTitle}>Archivos Guardados (Exportar)</Text>
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={refreshFiles}
@@ -504,13 +507,13 @@ Guardado: ${obj.guardado}`;
                 </View>
                 <View style={styles.fileActions}>
                     <TouchableOpacity 
-                        style={[styles.smallActionButton, {backgroundColor: '#5AC8FA'}]}
+                        style={[styles.smallActionButton, {backgroundColor: COLORS.info}]}
                         onPress={() => shareFile(fileInfo)}
                     >
-                        <Text style={styles.smallActionButtonText}>Exportar</Text>
+                        <Text style={styles.smallActionButtonText}>Compartir</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                        style={[styles.smallActionButton, {backgroundColor: '#FF3B30'}]}
+                        style={[styles.smallActionButton, {backgroundColor: COLORS.danger}]}
                         onPress={() => deleteFile(fileInfo)}
                     >
                         <Text style={styles.smallActionButtonText}>Eliminar</Text>
@@ -523,11 +526,7 @@ Guardado: ${obj.guardado}`;
           <Text style={styles.noFilesText}>No hay archivos de reserva guardados en este dispositivo.</Text>
         )}
       </View>
-      {/* --- FIN LISTA DE ARCHIVOS --- */}
-      
-      {/* --- DATETIMEPICKER NATIVO (Android/iOS) --- */}
-      {/* Nota: En iOS, esto muestra el picker nativo, no un modal flotante.
-              En Android, esto abre el diálogo nativo. */}
+     
       {showDatePicker && Platform.OS !== 'web' && (
         <DateTimePicker
           testID="datePicker"
@@ -536,6 +535,7 @@ Guardado: ${obj.guardado}`;
           is24Hour={true}
           display={Platform.OS === 'android' ? 'default' : 'spinner'} 
           onChange={onChangeDate}
+          textColor={COLORS.textPrimary} 
         />
       )}
       
@@ -544,15 +544,14 @@ Guardado: ${obj.guardado}`;
           testID="timePicker"
           value={time}
           mode="time"
-          is24Hour={false} // Mantener AM/PM
+          is24Hour={false} 
           display={Platform.OS === 'android' ? 'default' : 'spinner'}
           onChange={onChangeTime}
+          textColor={COLORS.textPrimary} 
         />
       )}
       
-      {/* --- MODALES PERSONALIZADOS (Web / Fallback iOS) --- */}
-      
-      {/* Modal de Área */}
+     
       <CustomPickerModal
         visible={showOptionsPicker}
         onClose={() => setShowOptionsPicker(false)}
@@ -566,14 +565,13 @@ Guardado: ${obj.guardado}`;
       <CustomPickerModal
         visible={showFormatPicker}
         onClose={() => setShowFormatPicker(false)}
-        title="Selecciona el Formato"
+        title="Formato de Exportación"
         options={FORMAT_OPTIONS}
         selectedValue={selectedFormat}
         onSelect={setSelectedFormat}
       />
 
-      {/* Modal Date/Time CUSTOM (Solo para Web o iOS/Android si decides NO usar el nativo) */}
-      {/* NOTA: En la lógica actual, solo se usa para Web */}
+      {/* Modal Date/Time CUSTOM (Web) */}
       {(showDatePicker && Platform.OS === 'web') ? (
         <DatePickerModal
           visible={showDatePicker}
@@ -603,9 +601,7 @@ Guardado: ${obj.guardado}`;
   );
 }
 
-// =================================================================
-// --- COMPONENTES DE MODAL SIMPLIFICADOS (Para limpiar el render) ---
-// =================================================================
+
 
 interface CustomPickerProps {
   visible: boolean;
@@ -627,7 +623,7 @@ const CustomPickerModal: React.FC<CustomPickerProps> = ({
   <Modal
     visible={visible}
     transparent={true}
-    animationType="slide"
+    animationType="fade" // Animación 'fade' es más sutil para Dark Mode
     onRequestClose={onClose}
   >
     <View style={styles.modalOverlay}>
@@ -656,7 +652,7 @@ const CustomPickerModal: React.FC<CustomPickerProps> = ({
           ))}
         </ScrollView>
         <TouchableOpacity
-            style={[styles.actionButton, styles.secondaryButton]}
+            style={[styles.secondaryButton, { marginTop: 15 }]}
             onPress={onClose}
         >
              <Text style={styles.secondaryButtonText}>Cerrar</Text>
@@ -666,11 +662,7 @@ const CustomPickerModal: React.FC<CustomPickerProps> = ({
   </Modal>
 );
 
-// Los modales de fecha y hora personalizados (DatePickerModal, TimePickerModal) 
-// usan la misma estructura de CustomPickerModal pero con lógica de scroll compleja. 
-// Los dejo definidos fuera de App() para mantener la limpieza, usando estilos similares.
-
-// (Manteniendo la complejidad de scroll de fecha/hora para Web/fallback)
+// --- MODALES DE FECHA Y HORA (Web/Fallback) con Dark Mode ---
 
 interface DatePickerModalProps {
   visible: boolean;
@@ -695,7 +687,6 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
   months,
   getDaysArray,
 }) => {
-    // Lógica interna de la fecha (mantenida de tu código original)
     function handleAccept() {
         setDate(tempDate);
         onClose();
@@ -709,7 +700,7 @@ const DatePickerModal: React.FC<DatePickerModalProps> = ({
         <Modal
             visible={visible}
             transparent={true}
-            animationType="slide"
+            animationType="fade"
             onRequestClose={handleCancel}
         >
             <View style={styles.modalOverlay}>
@@ -793,7 +784,6 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
   setTempTime,
   setTime,
 }) => {
-    // Lógica interna de la hora (mantenida de tu código original)
     function handleAccept() {
         setTime(tempTime);
         onClose();
@@ -807,7 +797,7 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
         <Modal
             visible={visible}
             transparent={true}
-            animationType="slide"
+            animationType="fade"
             onRequestClose={handleCancel}
         >
             <View style={styles.modalOverlay}>
@@ -880,14 +870,12 @@ const TimePickerModal: React.FC<TimePickerModalProps> = ({
 };
 
 
-// =================================================================
-// --- ESTILOS MODERNOS Y RESPONSIVOS ---
-// =================================================================
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F9FC', // Fondo muy claro
+    backgroundColor: COLORS.background, 
   },
   contentContainer: {
     padding: 20,
@@ -896,59 +884,58 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 5,
     textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 20,
     textAlign: 'center',
   },
-  // --- Card Styling ---
+  // --- Card Styling (Dark Mode) ---
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
+    backgroundColor: COLORS.card,
+    borderRadius: 15,
+    padding: 18,
     marginBottom: 25,
-    // Sombra elegante para iOS
+    // Sombra sutil para darle profundidad al card en modo oscuro
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    // Sombra para Android
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#1E3A8A', // Azul oscuro
+    color: COLORS.textPrimary,
     marginBottom: 10,
   },
   separator: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: COLORS.inputBackground,
     marginVertical: 10,
   },
   // --- Form Elements ---
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4B5563', // Gris oscuro
+    color: COLORS.textSecondary,
     marginTop: 10,
     marginBottom: 5,
   },
   input: {
-    minHeight: 44,
-    borderColor: '#D1D5DB', // Borde gris claro
+    minHeight: 48,
+    borderColor: '#444444', // Borde gris más oscuro
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    backgroundColor: COLORS.inputBackground,
     fontSize: 16,
-    color: '#1F2937',
-    marginBottom: 10,
+    color: COLORS.textPrimary, // Texto blanco
+    marginBottom: 15,
   },
   textArea: {
     height: 100,
@@ -956,18 +943,18 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   pickerDisplay: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#D1D5DB',
+    backgroundColor: COLORS.inputBackground,
+    borderColor: '#444444',
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    minHeight: 44,
+    borderRadius: 10,
+    padding: 14,
+    minHeight: 48,
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   pickerDisplayText: {
     fontSize: 16,
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     fontWeight: '500',
   },
   // --- Buttons ---
@@ -975,37 +962,40 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   actionButton: {
-    backgroundColor: '#007AFF', // Azul primario
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: COLORS.accent, // Color de acento llamativo
+    borderRadius: 10,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 20,
   },
   actionButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textPrimary, // Blanco para alto contraste
     fontSize: 16,
     fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: '#E5E7EB', // Gris secundario
+    backgroundColor: '#333333', // Gris oscuro para botones secundarios
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    width: '100%',
   },
   secondaryButtonText: {
-    color: '#4B5563',
+    color: COLORS.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
   smallActionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     marginTop: 0,
     marginLeft: 8,
+    borderRadius: 8,
   },
   smallActionButtonText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '600',
+      color: COLORS.textPrimary,
   },
   refreshButton: {
       alignSelf: 'flex-start',
@@ -1013,11 +1003,11 @@ const styles = StyleSheet.create({
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 6,
-      backgroundColor: '#E0F2FE', // Azul muy claro
+      backgroundColor: '#333333', 
   },
   refreshButtonText: {
       fontSize: 14,
-      color: '#1D4ED8', // Azul oscuro para texto
+      color: COLORS.textSecondary, 
       fontWeight: '600',
   },
   // --- Files List ---
@@ -1026,22 +1016,23 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: COLORS.textSecondary,
     marginBottom: 10,
     fontStyle: 'italic',
   },
   noFilesText: {
     textAlign: 'center',
-    color: '#6B7280',
+    color: COLORS.textSecondary,
     paddingVertical: 15,
   },
   fileItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#333333',
   },
   fileInfo: {
     flex: 1,
@@ -1050,59 +1041,59 @@ const styles = StyleSheet.create({
   fileName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#3B82F6', // Azul para el nombre del archivo
+    color: COLORS.textPrimary,
   },
   fileSize: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   fileActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // --- Modal Styles (Refined) ---
+  // --- Modal Styles (Dark Mode) ---
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center', // Centrado para mayor elegancia
+    justifyContent: 'center', 
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fondo más oscuro
+    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Fondo de modal más opaco
   },
   modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    width: '90%', // Más responsivo
+    backgroundColor: COLORS.card,
+    padding: 25,
+    borderRadius: 15,
+    width: '90%', 
     maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.4,
     shadowRadius: 10,
-    elevation: 10,
+    elevation: 15,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 15,
     textAlign: 'center',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
   },
   optionItem: {
-    padding: 12,
+    padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    backgroundColor: '#fff',
+    borderBottomColor: '#333333',
+    backgroundColor: COLORS.card,
   },
   optionItemSelected: {
-    backgroundColor: '#E0F2FE', // Azul claro para seleccionado
+    backgroundColor: '#333333', // Gris oscuro para seleccionado
   },
   optionText: {
     fontSize: 16,
-    color: '#1F2937',
+    color: COLORS.textPrimary,
   },
   optionTextSelected: {
     fontWeight: 'bold',
-    color: '#1D4ED8',
+    color: COLORS.accent,
   },
   pickerScrollView: {
     maxHeight: 250,
@@ -1113,7 +1104,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 10,
     marginBottom: 5,
-    color: '#374151',
+    color: COLORS.textSecondary,
   },
   horizontalPicker: {
     flexDirection: 'row',
@@ -1126,18 +1117,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.inputBackground,
     minWidth: 40,
   },
   pickerItemSelected: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.accent,
   },
   pickerItemText: {
     fontSize: 14,
-    color: '#374151',
+    color: COLORS.textPrimary,
   },
   pickerItemTextSelected: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     fontWeight: 'bold',
   },
   modalButtons: {
@@ -1155,21 +1146,21 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#444444',
     minWidth: 80,
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.inputBackground,
   },
   ampmButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
   ampmText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
+    color: COLORS.textPrimary,
   },
   ampmTextSelected: {
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
 });
